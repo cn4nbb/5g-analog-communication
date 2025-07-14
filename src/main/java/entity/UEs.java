@@ -46,13 +46,15 @@ public class UEs {
     public String processAuthResponse(String rand, String autn) {
         this.rand = rand;
         this.autn = autn;
+
         if (!rand.startsWith("Fake") && verifyAUTN(rand, autn)) {
-            System.out.println("UE: 认证成功。");
+            System.out.println("UE [" + supi + "]: 认证成功。");
             return "NAS Security Mode Command";
         } else {
-            String failureReason = rand.startsWith("Fake") ? "MAC_Failure" : "Sync_Failure,AUTS";
-            System.out.println("UE: 认证失败，原因: " + failureReason);
-            return failureReason;
+            String failureReason = rand.startsWith("Fake") ? "MAC_Failure" : "Sync_Failure";
+            String fullReason = failureReason + "|" + this.supi;
+            System.out.println("UE [" + supi + "]: 认证失败 - " + fullReason);
+            return fullReason;
         }
     }
 
@@ -130,5 +132,16 @@ public class UEs {
      */
     public boolean isRegistered() {
         return isRegistered;
+    }
+
+    public String process5GMMRejectMessage(String rejectMsg) {
+        if (rejectMsg.contains("Reason=7")) {
+            System.out.println("UE [" + supi + "]：收到5GMM拒绝消息（#7），USIM将被标记为无法使用5G网络，直到重启或重新插拔。");
+        } else if (rejectMsg.contains("Reason=11")) {
+            System.out.println("UE [" + supi + "]：收到5GMM拒绝消息（#11），该PLMN被加入禁用列表，无法再驻留此网络。");
+        } else {
+            System.out.println("UE [" + supi + "]：收到未知5GMM原因码，忽略。");
+        }
+        return "Handled";
     }
 }

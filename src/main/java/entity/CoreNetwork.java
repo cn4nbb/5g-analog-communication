@@ -65,7 +65,7 @@ public class CoreNetwork {
         return "AuthFailure";
     }
 
-    public String processRegistrationRequest(String suci) {
+    public String processRegistrationRequest(String suci,boolean useFake) {
         Attacker attacker = new Attacker();
         System.out.println("核心网: 处理认证请求，SUCI=" + suci);
         // 判断是否是伪造数据
@@ -73,7 +73,19 @@ public class CoreNetwork {
             System.out.println("核心网: 检测到伪造的SUCI!");
         }
         // 返回正常或伪造的认证响应
-        return attacker.fakeAuthResponse();
+        if (useFake) {
+            return attacker.fakeAuthResponse();
+        } else {
+            return generateAuthResponse();
+        }
+    }
+
+    /**
+     * 处理 5GMM 欺骗攻击的认证请求
+     */
+    public String process5GMMDeceptionRequest(String suci) {
+        // 返回伪造的5GMM拒绝消息
+        return "Register Reject: 5GMM Reason=7";  // 返回伪造的拒绝消息
     }
 
 }

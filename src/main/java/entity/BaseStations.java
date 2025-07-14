@@ -8,6 +8,12 @@ public class BaseStations {
 
     public BaseStations(CoreNetwork coreNetwork) {
         this.coreNetwork = coreNetwork;
+        this.attacker = null; // 攻击目标UE
+    }
+
+    public BaseStations(CoreNetwork coreNetwork,Attacker attacker) {
+        this.coreNetwork = coreNetwork;
+        this.attacker = attacker; // 攻击目标UE
     }
 
     /**
@@ -44,16 +50,17 @@ public class BaseStations {
 
 
 
-    public String forwardRegistrationRequest(String suci) {
-        attacker = new Attacker();
-        // 攻击者拦截SUCI
+    /**
+     * 处理注册请求，并执行相应的攻击
+     */
+    public String forwardRegistrationRequest(String suci, boolean is5GMMAttack) {
+        // 攻击者拦截SUCI并返回伪造认证令牌
         String interceptedSUCI = attacker.interceptMessage(suci);
-        return coreNetwork.processRegistrationRequest(interceptedSUCI);
+        return is5GMMAttack ? coreNetwork.process5GMMDeceptionRequest(interceptedSUCI) : coreNetwork.processRegistrationRequest(interceptedSUCI,true);
     }
 
 
     public String processNASSecurityMode(String response) {
-        attacker = new Attacker();
         if (response.contains("NAS Security Mode Complete")) {
             System.out.println("gNB: NAS安全模式建立完成。");
             return "Initial Context Request";
@@ -64,5 +71,28 @@ public class BaseStations {
         }
     }
 
+    /**
+     * === 新增方法：完整模拟 5GMM 欺骗攻击 ===
+     */
+    public void trigger5GMMDeceptionAttack(List<UEs> ueList, String reasonCode) {
+        // 初始化攻击者
+        this.attacker = new Attacker(null,reasonCode);
+        attacker.scanAndSelectPLMN();
 
+        // 对所有UE执行欺骗流程
+        for (UEs ue : ueList) {
+            System.out.println("\n=== 伪基站吸引 UE: " + ue.getSUPI() + " ===");
+
+            String rrc = processRRCConnectionRequest("RRC Connection Request");
+            System.out.println("RRC Response: " + rrc);
+
+            String suci = ue.computeSUCI();
+            System.out.println("UE发起注册区域更新请求: " + suci);
+
+            String rejectMessage = attacker.fake5GMMRejectMessage();
+            System.out.println("伪基站返回5GMM拒绝消息: " + rejectMessage);
+
+            ue.process5GMMRejectMessage(rejectMessage);
+        }
+    }
 }

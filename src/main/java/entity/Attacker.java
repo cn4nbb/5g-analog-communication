@@ -1,14 +1,20 @@
 package entity;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Attacker {
     private Map<String, String> collectedAuthTokens = new HashMap<>();
     private String targetUE;
+    private List<String> observedPLMNs = new ArrayList<>();
+    private String selectedPLMN;
+    private String reasonCode;
 
-    public Attacker(String targetUE) {
+    public Attacker(String targetUE,String reasonCode) {
         this.targetUE = targetUE;
+        this.reasonCode = reasonCode;
     }
 
     public Attacker(){
@@ -34,7 +40,7 @@ public class Attacker {
             return collectedAuthTokens.get(supi);
         } else {
             System.out.println("攻击者: 未收集到目标UE的认证令牌！");
-            return "Fake_RAND,Fake_AUTN";
+            return fakeAuthResponse();
         }
     }
 
@@ -43,11 +49,23 @@ public class Attacker {
      * @param failureMessage
      */
     public void analyzeFailureMessage(String failureMessage) {
-        System.out.println("攻击者: 接收到认证失败消息 - " + failureMessage);
-        if (failureMessage.contains("MAC_Failure")) {
-            System.out.println("攻击者: 目标UE不在覆盖范围内。");
-        } else if (failureMessage.contains("Sync_Failure")) {
-            System.out.println("攻击者: 目标UE在覆盖范围内，成功识别目标设备！");
+        if (!failureMessage.contains("|")) {
+            System.out.println("攻击者: 未识别的认证失败格式");
+            return;
+        }
+
+        String[] parts = failureMessage.split("\\|");
+        String reason = parts[0];
+        String supi = parts[1];
+
+        System.out.println("攻击者: 认证失败响应 - 原因: " + reason + ", 来自: " + supi);
+
+        if ("Sync_Failure".equals(reason) && supi.equals(targetUE)) {
+            System.out.println("🎯 识别成功：目标UE [" + supi + "] 出现在覆盖范围内！");
+        } else if ("Sync_Failure".equals(reason)) {
+            System.out.println("攻击者: 非目标UE [" + supi + "] 同步失败，忽略");
+        } else if ("MAC_Failure".equals(reason)) {
+            System.out.println("攻击者: [" + supi + "] MAC校验失败，不是目标UE");
         }
     }
 
@@ -81,5 +99,51 @@ public class Attacker {
         String fakeAutn = "Fake_AUTN_Value";
         System.out.println("攻击者: 发送伪造认证响应 - RAND: " + fakeRand + ", AUTN: " + fakeAutn);
         return fakeRand + "," + fakeAutn;
+    }
+
+    /**
+     * 模拟伪造的注册拒绝消息
+     * @param reason 5GMM拒绝原因
+     * @return
+     */
+    public String fakeRegisterRejectMessage(String reason) {
+        // 根据攻击需要返回不同的拒绝消息
+        return "Register Reject: 5GMM Reason=" + reason;
+    }
+
+    /**
+     * 模拟监听并收集合法PLMN
+     */
+    public void scanAndSelectPLMN() {
+        observedPLMNs.add("46000"); // 中国移动
+        observedPLMNs.add("46001"); // 中国联通
+        observedPLMNs.add("46011"); // 中国电信
+
+        selectedPLMN = observedPLMNs.get(0); // 选择一个作为目标
+        System.out.println("攻击者: 监听到合法PLMN列表: " + observedPLMNs);
+        System.out.println("攻击者: 选择用于欺骗的PLMN: " + selectedPLMN);
+    }
+
+    /**
+     * 返回模拟注册拒绝消息
+     */
+    public String fake5GMMRejectMessage() {
+        return "Register Reject: 5GMM Reason=" + reasonCode + " from PLMN=" + selectedPLMN;
+    }
+
+    public String getSelectedPLMN() {
+        return selectedPLMN;
+    }
+
+    public String getReasonCode() {
+        return reasonCode;
+    }
+
+    public String getRandForTarget() {
+        return collectedAuthTokens.get(targetUE).split(",")[0];
+    }
+
+    public String getAutnForTarget() {
+        return collectedAuthTokens.get(targetUE).split(",")[1];
     }
 }
